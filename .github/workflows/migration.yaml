@@ -5,6 +5,11 @@ on:
     branches:
       - main
 
+env:
+  POSTGRES_USER: testuser
+  POSTGRES_PASSWORD: testpassword
+  POSTGRES_DB: testdb
+
 jobs:
   migrate:
     runs-on: ubuntu-latest
@@ -13,9 +18,9 @@ jobs:
       postgres:
         image: postgres:13  # Указывает на Docker-образ, который будет использоваться для запуска базы данных
         env:  # Через переменные окружения задаются имя пользователя, пароль и название базы данных
-          POSTGRES_USER: testuser
-          POSTGRES_PASSWORD: testpassword
-          POSTGRES_DB: testdb
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
         ports:  # Доступ к порту извне контейнера
           - 5432:5432
         # Настройка хэлсчеков, чтобы понять, когда PostgreSQL запустится
@@ -51,7 +56,17 @@ jobs:
       # Выполняем миграции с помощью Flyway, используя URL подключения и учётные данные для базы данных
       - name: Run Flyway migrations
         env:
-          FLYWAY_URL: "jdbc:postgresql://localhost:5432/testdb"
-          FLYWAY_USER: testuser
-          FLYWAY_PASSWORD: testpassword
+          FLYWAY_URL: "jdbc:postgresql://localhost:5432/${{ env.POSTGRES_DB }}"
+          FLYWAY_USER: ${{ env.POSTGRES_USER }}
+          FLYWAY_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
         run: flyway migrate -locations=filesystem:sql/migrations
+
+      - name: Setup PSQL
+        run: |
+          sudo apt update
+          sudo apt install -y postgresql-client
+
+      - name: Check Flyway migrations
+        run: psql -U ${{ env.POSTGRES_USER }} -d ${{ env.POSTGRES_DB }} -c "SELECT * FROM flyway_schema_history;"
+
+
